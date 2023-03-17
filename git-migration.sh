@@ -6,6 +6,8 @@
 
 
 declare tmpDir
+declare -a repos
+declare newReposBase
 
 function ERROR {
 	if [ -n $tmpDir ]
@@ -81,12 +83,15 @@ if ! [ -d $argLocalDir ]
 then
 	mkdir -p $argLocalDir
 fi
+newReposBase="ssh://$argLocalUsername@$argLocalOuterIp:$(readlink -f $argLocalDir)/"
+echo "newReposBase: \"$newReposBase\""
 echo '
 Клонирую удалённые репозитории
 '
 for iRepo in $(cat $argRepoList)
 do
 	fClone $iRepo
+	repos=(${repos[@]} $iRepo)
 done
 
 echo '
@@ -94,7 +99,7 @@ echo '
 '
 tmpDir=$(mktemp -d)
 mkdir $tmpDir/tt
-for iRepo in $(cat $argRepoList)
+for iRepo in ${repos[@]}
 do
 	echo "-- $iRepo --"
 	git clone $argLocalDir/$iRepo.git $tmpDir/tt &> /dev/null || ERROR 230316.20081
@@ -104,8 +109,31 @@ do
 			echo "	$iBranch"
 			# место, откуда можно пушить
 
-			# sed -e 's/https:\/\/bitbucket.locotech-signal.ru\/scm\/td\/cmake.git/http:\/\/qwe.rty/' .gitmodules
+			git checkout $iBranch &> /dev/null #|| ERROR "Не удалось переключиться на ветку \"$iBranch\""
+			if [ -f .gitmodules ]
+			then
+				tmp=$(mktemp)
+				for iRepo2 in ${repos[@]}
+				do
+					for iRemoteBase in $argRemoteBase $argRemoteBaseAlias
+					do
+						oldBase="${iRemoteBase//\//\\\/}"
+						newBase="${newReposBase//\//\\\/}"
+						sed -e "s/$oldBase$iRepo2.git/$newBase$iRepo2.git/g" .gitmodules > $tmp
+						cat $tmp > .gitmodules
+					done
+				done
+				rm $tmp
+				if [ -n "$(git diff .gitmodules)" ]
+				then
+					git add .gitmodules &&
+					git commit -m "$iBranch: submodules remote replaced for $newReposBase" &&
+					git push ||
+					ERROR "Не удалось закоммитить изменённый .gitmodules для репозитория \"$iRepo\" (ветка \"$iBranch\")"
+				fi
+			fi
 		done
+		echo
 		#getDefaultBranch
 	popd > /dev/null
 	rm -rf $tmpDir/tt || ERROR 230316.20082
