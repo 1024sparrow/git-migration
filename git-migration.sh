@@ -4,6 +4,17 @@
 #read -p 'Введите директорию, куда сложить локальные репозитории: ' argLocalDir
 #read -p 'Введите базовый адрес для выкачивания удалённых репозиториев (например, ssh://git@bitbucket.mycompany.ru:2158/td/): ' argRemoteBase
 
+for iArg in $@
+do
+	if [ "$iArg" == --help ]
+	then
+		echo '
+qwe rty
+'
+		exit 0
+	fi
+done
+
 
 declare tmpDir
 declare -a repos
